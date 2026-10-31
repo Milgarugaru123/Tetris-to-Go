@@ -19,6 +19,6 @@
 <br /><hr /><br />
 <h4>Credits</h4>
 <ul>
-  <li>KyattoWorks</li>
-  <li>ああああ</li>
+  <li><a href="https://kyattoworks.com/">KyattoWorks</a></li>
+  <li><a href="https://aiueoeiua.wixsite.com/aaaaofficial">ああああ</a></li>
 </ul>

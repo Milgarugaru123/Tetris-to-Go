@@ -15,3 +15,10 @@
 </ul>
 <br /><br /><br />
 그럼 모두 재미있게 플레이하세요~
+
+<hr /><br /><br />
+<h4>Credits</h4>
+<ul>
+  <li>KyattoWorks</li>
+  <li>ああああ</li>
+</ul>

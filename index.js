@@ -1,4 +1,13 @@
-import { holdCase, tetrisScreen, nextCase, furtherNextCase } from "./query.js";
+import {
+  holdCase,
+  tetrisScreen,
+  nextCase,
+  furtherNextCase,
+  curScore,
+  highScore,
+  spinReview,
+  restartBtn,
+} from "./query.js";
 import {
   minoDatas,
   makeMino,
@@ -11,24 +20,34 @@ import {
   rendHold,
   gameData,
   gameGridData,
-  minoFall,
   takeoutNext,
+  toggleRestartBtn,
+  bgmStart,
+  bgmCrossFade,
 } from "./game.js";
+import {
+  scoreData,
+  rendScore,
+  softDropScore,
+  hardDropScore,
+  lineClearScore,
+} from "./score_system.js";
 import "./query.js";
 import "./mino_datas.js";
 import "./game.js";
+import "./score_system.js";
 
 const gamePreview = () => {
   refillBag();
   rendNext();
   rendHold();
+  gameData.score = 0;
+  rendScore();
 };
 
 const gameStart = () => {
+  scoreData.maxedScoreLen = undefined;
   takeoutNext();
-  gameData.gameSpeed = gameData.initGameSpeed;
-  minoFall();
-  console.log(gameData);
 };
 
 const countDown = (count) => {
@@ -54,10 +73,18 @@ const countDown = (count) => {
 
 const gameReady = () => {
   gamePreview();
+  bgmStart(3000);
   countDown(3);
 };
 
+restartBtn.addEventListener(`click`, (e) => {
+  window.location.reload();
+});
+
 /* init */
+
+curScore.innerHTML = `－－`;
+highScore.innerHTML = `－－`;
 
 const startBtn = document.createElement(`button`);
 startBtn.innerHTML = `Tetris To Start!`;
@@ -66,6 +93,7 @@ document.body.appendChild(startBtn);
 
 startBtn.addEventListener(`click`, () => {
   document.body.removeChild(startBtn);
+  toggleRestartBtn(`off`);
   gameReady();
 });
 

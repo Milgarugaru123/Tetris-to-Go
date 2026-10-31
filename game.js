@@ -1,4 +1,13 @@
-import { holdCase, tetrisScreen, nextCase, furtherNextCase } from "./query.js";
+import {
+  holdCase,
+  tetrisScreen,
+  nextCase,
+  furtherNextCase,
+  curScore,
+  highScore,
+  spinReview,
+  restartBtn,
+} from "./query.js";
 import {
   minoDatas,
   makeMino,
@@ -6,6 +15,13 @@ import {
   minoBag,
   refillBag,
 } from "./mino_datas.js";
+import {
+  scoreData,
+  rendScore,
+  softDropScore,
+  hardDropScore,
+  lineClearScore,
+} from "./score_system.js";
 
 const keyDatas = {
   leftPressed: false,
@@ -23,14 +39,14 @@ const intervalId = {
   leftKey: undefined,
   rightKey: undefined,
   downKey: undefined,
-  minoFall: [],
+  minoFall: undefined,
 };
 export const gameData = {
   isPlaying: false,
   highscore: 0,
   score: 0,
-  gameSpeed: 0,
   initGameSpeed: 1500,
+  curBgm: undefined,
   curMino: undefined,
   minoPos: {
     spinPos: undefined,
@@ -45,6 +61,7 @@ export const gameData = {
   minoDownInterval: 30, // init: 30~50
   minoSideMoveInterval: 80, // init: 70~80
   bottomDelay: 0,
+  maxBottomDelay: 10,
 };
 export const gameGridData = new Array(24).fill(0).map((row) => {
   return Array(10)
@@ -54,12 +71,72 @@ export const gameGridData = new Array(24).fill(0).map((row) => {
     });
 });
 
-export const minoFall = () => {
+const minoFall = () => {
   if (!gameData.isPlaying) return;
+  gameData.isSpinned = false;
+  const scoreLen = [...(`` + Math.floor(gameData.score / 100))].length;
+  const balance = 5; // 난이도 별 속도 조절용
+  const alpha =
+    ((scoreLen < 2 ? 0 : (scoreLen - 1) ** 2) * 10 +
+      Math.floor(gameData.score / 10 ** (scoreLen < 2 ? 2 : scoreLen + 1)) *
+        (scoreLen * 2 - 1)) *
+    balance;
+  if (
+    gameData.initGameSpeed - alpha < gameData.minoDownInterval &&
+    !scoreData.maxedScoreLen
+  )
+    scoreData.maxedScoreLen = scoreLen;
+  const interval =
+    gameData.initGameSpeed - alpha < gameData.minoDownInterval
+      ? Math.max(
+          gameData.minoDownInterval -
+            (scoreLen - scoreData.maxedScoreLen) * balance,
+          10,
+        )
+      : gameData.initGameSpeed - alpha;
   intervalId.minoFall = setTimeout(() => {
-    keyPressDown();
-    minoFall();
-  }, gameData.gameSpeed);
+    if (keyDatas.downPressed) {
+      if (checkMoveConflict(`down`)) gameData.bottomDelay += 1;
+      console.log(gameData.bottomDelay);
+      if (gameData.bottomDelay < Math.ceil(gameData.maxBottomDelay / 4))
+        minoFall();
+      else if (
+        gameData.bottomDelay < Math.ceil(gameData.maxBottomDelay / 2) &&
+        (gameData.isSpinned || keyDatas.leftPressed || keyDatas.rightPressed)
+      )
+        minoFall();
+      else if (
+        gameData.bottomDelay < gameData.maxBottomDelay &&
+        gameData.isSpinned
+      )
+        minoFall();
+      else {
+        fixCurMino();
+        takeoutNext();
+      }
+    } else {
+      const isConflict = keyPressDown();
+      if (isConflict) gameData.bottomDelay += 1;
+      else if (gameData.bottomDelay > 0) gameData.bottomDelay += 0.5;
+      console.log(gameData.bottomDelay);
+      if (gameData.bottomDelay < Math.ceil(gameData.maxBottomDelay / 4))
+        minoFall();
+      else if (
+        gameData.bottomDelay < Math.ceil(gameData.maxBottomDelay / 2) &&
+        (gameData.isSpinned || keyDatas.leftPressed || keyDatas.rightPressed)
+      )
+        minoFall();
+      else if (
+        gameData.bottomDelay < gameData.maxBottomDelay &&
+        gameData.isSpinned
+      )
+        minoFall();
+      else {
+        fixCurMino();
+        takeoutNext();
+      }
+    }
+  }, interval);
 };
 
 export const rendNext = () => {
@@ -146,6 +223,22 @@ const rendBoard = () => {
           }
         });
     });
+};
+
+const fixCurMino = () => {
+  gameGridData[gameData.minoPos.spinPos.row + 4][
+    gameData.minoPos.spinPos.grid
+  ].isMoving = false;
+  gameGridData[gameData.minoPos.rend1.row + 4][
+    gameData.minoPos.rend1.grid
+  ].isMoving = false;
+  gameGridData[gameData.minoPos.rend2.row + 4][
+    gameData.minoPos.rend2.grid
+  ].isMoving = false;
+  gameGridData[gameData.minoPos.rend3.row + 4][
+    gameData.minoPos.rend3.grid
+  ].isMoving = false;
+  gameData.minoPos.spinPos = undefined;
 };
 
 const minoOffGrid = (row, grid) => {
@@ -583,8 +676,9 @@ const setMinoRendGrids = () => {
 };
 
 const gameOver = () => {
+  gameData.isPlaying = false;
   window.alert(`Game Over!`);
-  window.location.reload();
+  toggleRestartBtn();
 };
 
 const checkGridConflict = (row, grid) => {
@@ -658,10 +752,12 @@ const checkMoveConflict = (move = `stop`) => {
   }
 };
 
+/* 완성된 줄 지우기 */
 const checkRowComplete = () => {
-  Array(24)
+  scoreData.lineCleared = 0;
+  const gridFilled = Array(24)
     .fill(0)
-    .forEach((x, row) => {
+    .map((x, row) => {
       const rowFilled = Array(10)
         .fill(0)
         .map((y, grid) => {
@@ -670,6 +766,7 @@ const checkRowComplete = () => {
         })
         .reduce((a, b) => a + b);
       if (rowFilled === 10) {
+        scoreData.lineCleared += 1;
         if (row >= 4) {
           Array(10)
             .fill(0)
@@ -689,8 +786,32 @@ const checkRowComplete = () => {
                 };
               });
           });
+        Array(10)
+          .fill(0)
+          .forEach((y, grid) => {
+            gameGridData[0][grid] = { mino: undefined, isMoving: undefined };
+          });
       }
-    });
+      return rowFilled;
+    })
+    .reduce((x, y) => x + y);
+  console.log(
+    scoreData.isT_Spin
+      ? scoreData.isT_Spin == `mini`
+        ? `T Spin mini!`
+        : `T SPIN!`
+      : ``,
+  );
+  if (scoreData.lineCleared > 0) {
+    scoreData.combo += 1;
+    if (scoreData.lineCleared === 4 || scoreData.isT_Spin)
+      scoreData.isBTB = true;
+    else scoreData.isBTB = false;
+    lineClearScore(!(gridFilled - scoreData.lineCleared * 10));
+  } else scoreData.combo = 0;
+  scoreData.tempScore = gameData.score;
+  scoreData.isT_Spin = false;
+  bgmCrossFade(3000);
 };
 
 const minoSpawn = () => {
@@ -699,6 +820,7 @@ const minoSpawn = () => {
   if (gameData.curMino == minoDatas[6].name)
     gameData.minoPos.spinPos = { row: -1, grid: 4 };
   gameData.minoSpin = 0;
+  gameData.isSpinned = false;
   gameData.bottomDelay = 0;
   setMinoRendGrids();
   const checkConflict = checkMoveConflict();
@@ -713,11 +835,13 @@ const minoSpawn = () => {
 
 /* 미노 회전축 스폰 위치 기준점 = gridDatas[0][4] (gameGridData[4][4]) */
 export const takeoutNext = () => {
+  clearTimeout(intervalId.minoFall);
   checkRowComplete();
   refillBag();
   gameData.curMino = minoBag.shift();
   gameData.holdDone = false;
   minoSpawn();
+  minoFall();
   rendNext();
 };
 
@@ -856,6 +980,9 @@ const checkHoldConflict = (mino) => {
 
 const changeHold = () => {
   if (gameData.holdDone) return;
+  scoreData.isT_Spin = false;
+  gameData.score = scoreData.tempScore;
+  rendScore();
   if (!gameData.holdMino) {
     if (checkHoldConflict(minoBag[0])) return;
     gameData.holdDone = true;
@@ -874,6 +1001,8 @@ const changeHold = () => {
 
 const keyPressDown = () => {
   if (checkMoveConflict(`down`)) return true;
+  scoreData.isT_Spin = false;
+  if (keyDatas.downPressed) softDropScore();
   minoRemovePrev();
   gameData.minoPos.spinPos = {
     row: gameData.minoPos.spinPos.row + 1,
@@ -885,6 +1014,7 @@ const keyPressDown = () => {
 };
 const keyPressLeft = () => {
   if (checkMoveConflict(`left`)) return;
+  scoreData.isT_Spin = false;
   minoRemovePrev();
   gameData.minoPos.spinPos = {
     row: gameData.minoPos.spinPos.row,
@@ -895,6 +1025,7 @@ const keyPressLeft = () => {
 };
 const keyPressRight = () => {
   if (checkMoveConflict(`right`)) return;
+  scoreData.isT_Spin = false;
   minoRemovePrev();
   gameData.minoPos.spinPos = {
     row: gameData.minoPos.spinPos.row,
@@ -904,26 +1035,15 @@ const keyPressRight = () => {
   rendMino();
 };
 
-const minoDrop = () => {
+const minoDrop = (height) => {
   const isBottom = keyPressDown();
-  if (isBottom) return;
-  else minoDrop();
+  if (isBottom) return height;
+  else return minoDrop(height + 1);
 };
 const keyPressSpacebar = () => {
-  minoDrop();
-  gameGridData[gameData.minoPos.spinPos.row + 4][
-    gameData.minoPos.spinPos.grid
-  ].isMoving = false;
-  gameGridData[gameData.minoPos.rend1.row + 4][
-    gameData.minoPos.rend1.grid
-  ].isMoving = false;
-  gameGridData[gameData.minoPos.rend2.row + 4][
-    gameData.minoPos.rend2.grid
-  ].isMoving = false;
-  gameGridData[gameData.minoPos.rend3.row + 4][
-    gameData.minoPos.rend3.grid
-  ].isMoving = false;
-  gameData.minoPos.spinPos = undefined;
+  const mino_height = minoDrop(0);
+  hardDropScore(mino_height);
+  fixCurMino();
   takeoutNext();
 };
 
@@ -963,8 +1083,16 @@ const setI_MinoSpinned = (pos, pos1, pos2, pos3) => {
 3~5. 한 칸 아래 (스핀 방향 -> 반대 방향)
 6~8. 두 칸 아래 (스핀 방향 -> 반대 방향)
 9. 스핀 반대 방향 같은 높이
-10~12. 한 칸 위 (스핀 방향 -> 반대 방향)
+10~12. 한 칸 위 (직상, 스핀 방향, 반대 방향)
 -> 총 12 케이스
+*/
+
+/* T 스핀 스페셜 (기본 우선순위에서 약간 변형됨):
+1. 본래 위치
+2~3. 같은 높이 (반대 방향 -> 스핀 방향)
+4~6. 한 칸 아래 (스핀 방향 -> 반대 방향)
+7~9. 두 칸 아래 (스핀 방향 -> 반대 방향)
+10~12. 한 칸 위 (직상, 스핀 방향, 반대 방향)
 */
 
 /* 스핀 시 미노 이동 우선순위 (spinPos) (I 미노 전용):
@@ -1221,6 +1349,24 @@ const checkSpinMinoConflict = (pos, pos1, pos2, pos3, lr) => {
   )
     return 1;
   if (
+    gameData.curMino == minoDatas[6].name &&
+    !(
+      checkSpinOutOfBoard(
+        { row: pos.row, grid: pos.grid - lr },
+        { row: pos1.row, grid: pos1.grid - lr },
+        { row: pos2.row, grid: pos2.grid - lr },
+        { row: pos3.row, grid: pos3.grid - lr },
+      ) ||
+      checkGridConflict(pos.row, pos.grid - lr) ||
+      checkGridConflict(pos1.row, pos1.grid - lr) ||
+      checkGridConflict(pos2.row, pos2.grid - lr) ||
+      checkGridConflict(pos3.row, pos3.grid - lr)
+    )
+  ) {
+    scoreData.isT_Spin = `mini`;
+    return 9;
+  }
+  if (
     !(
       checkSpinOutOfBoard(
         { row: pos.row, grid: pos.grid + lr },
@@ -1326,6 +1472,7 @@ const checkSpinMinoConflict = (pos, pos1, pos2, pos3, lr) => {
   )
     return 8;
   if (
+    gameData.curMino !== minoDatas[6].name &&
     !(
       checkSpinOutOfBoard(
         { row: pos.row, grid: pos.grid - lr },
@@ -1343,21 +1490,6 @@ const checkSpinMinoConflict = (pos, pos1, pos2, pos3, lr) => {
   if (
     !(
       checkSpinOutOfBoard(
-        { row: pos.row - 1, grid: pos.grid + lr },
-        { row: pos1.row - 1, grid: pos1.grid + lr },
-        { row: pos2.row - 1, grid: pos2.grid + lr },
-        { row: pos3.row - 1, grid: pos3.grid + lr },
-      ) ||
-      checkGridConflict(pos.row - 1, pos.grid + lr) ||
-      checkGridConflict(pos1.row - 1, pos1.grid + lr) ||
-      checkGridConflict(pos2.row - 1, pos2.grid + lr) ||
-      checkGridConflict(pos3.row - 1, pos3.grid + lr)
-    )
-  )
-    return 10;
-  if (
-    !(
-      checkSpinOutOfBoard(
         { row: pos.row - 1, grid: pos.grid },
         { row: pos1.row - 1, grid: pos1.grid },
         { row: pos2.row - 1, grid: pos2.grid },
@@ -1367,6 +1499,21 @@ const checkSpinMinoConflict = (pos, pos1, pos2, pos3, lr) => {
       checkGridConflict(pos1.row - 1, pos1.grid) ||
       checkGridConflict(pos2.row - 1, pos2.grid) ||
       checkGridConflict(pos3.row - 1, pos3.grid)
+    )
+  )
+    return 10;
+  if (
+    !(
+      checkSpinOutOfBoard(
+        { row: pos.row - 1, grid: pos.grid + lr },
+        { row: pos1.row - 1, grid: pos1.grid + lr },
+        { row: pos2.row - 1, grid: pos2.grid + lr },
+        { row: pos3.row - 1, grid: pos3.grid + lr },
+      ) ||
+      checkGridConflict(pos.row - 1, pos.grid + lr) ||
+      checkGridConflict(pos1.row - 1, pos1.grid + lr) ||
+      checkGridConflict(pos2.row - 1, pos2.grid + lr) ||
+      checkGridConflict(pos3.row - 1, pos3.grid + lr)
     )
   )
     return 11;
@@ -1659,14 +1806,48 @@ const checkSpinConflict = (direction) => {
   }
 };
 
+const checkT_SpinOutOfBoard = (row, grid) => {
+  return row < -4 || row > 19 || grid < 0 || grid > 9;
+};
+
+const checkT_Spin = () => {
+  const pos = gameData.minoPos.spinPos;
+  return (
+    (checkT_SpinOutOfBoard(pos.row - 1, pos.grid - 1) ||
+    checkGridConflict(pos.row - 1, pos.grid - 1)
+      ? 1
+      : 0) +
+    (checkT_SpinOutOfBoard(pos.row - 1, pos.grid + 1) ||
+    checkGridConflict(pos.row - 1, pos.grid + 1)
+      ? 1
+      : 0) +
+    (checkT_SpinOutOfBoard(pos.row + 1, pos.grid - 1) ||
+    checkGridConflict(pos.row + 1, pos.grid - 1)
+      ? 1
+      : 0) +
+    (checkT_SpinOutOfBoard(pos.row + 1, pos.grid + 1) ||
+    checkGridConflict(pos.row + 1, pos.grid + 1)
+      ? 1
+      : 0)
+  );
+};
+
 /* 스핀 시 미노 이동 우선순위 (spinPos 기준) (I, O 미노 제외):
 1. 본래 위치
 2. 스핀 방향 앞 같은 높이
-3. 한 칸 아래 (스핀 방향 -> 반대 방향)
-4. 두 칸 아래 (스핀 방향 -> 반대 방향)
-5. 스핀 반대 방향 같은 높이
-6. 한 칸 위 (스핀 방향 -> 반대 방향)
+3~5. 한 칸 아래 (스핀 방향 -> 반대 방향)
+6~8. 두 칸 아래 (스핀 방향 -> 반대 방향)
+9. 스핀 반대 방향 같은 높이
+10~12. 한 칸 위 (직상, 스핀 방향, 반대 방향)
 -> 총 12 케이스
+*/
+
+/* T 스핀 스페셜 (기본 우선순위에서 약간 변형됨):
+1. 본래 위치
+2~3. 같은 높이 (반대 방향 -> 스핀 방향)
+4~6. 한 칸 아래 (스핀 방향 -> 반대 방향)
+7~9. 두 칸 아래 (스핀 방향 -> 반대 방향)
+10~12. 한 칸 위 (직상, 스핀 방향, 반대 방향)
 */
 
 /* 스핀 시 미노 이동 우선순위 (spinPos) (I 미노 전용):
@@ -1706,6 +1887,8 @@ const spinLeft = () => {
     case minoDatas[6].name:
       switch (checkConflict) {
         case 1:
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 2:
@@ -1715,29 +1898,41 @@ const spinLeft = () => {
         case 3:
           gameData.minoPos.spinPos.row += 1;
           gameData.minoPos.spinPos.grid -= 1;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 4:
           gameData.minoPos.spinPos.row += 1;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 5:
           gameData.minoPos.spinPos.row += 1;
           gameData.minoPos.spinPos.grid += 1;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 6:
           gameData.minoPos.spinPos.row += 2;
           gameData.minoPos.spinPos.grid -= 1;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 7:
           gameData.minoPos.spinPos.row += 2;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 8:
           gameData.minoPos.spinPos.row += 2;
           gameData.minoPos.spinPos.grid += 1;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 9:
@@ -1746,11 +1941,11 @@ const spinLeft = () => {
 
         case 10:
           gameData.minoPos.spinPos.row -= 1;
-          gameData.minoPos.spinPos.grid -= 1;
           break;
 
         case 11:
           gameData.minoPos.spinPos.row -= 1;
+          gameData.minoPos.spinPos.grid -= 1;
           break;
 
         case 12:
@@ -1795,6 +1990,8 @@ const spinRight = () => {
     case minoDatas[6].name:
       switch (checkConflict) {
         case 1:
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 2:
@@ -1804,29 +2001,41 @@ const spinRight = () => {
         case 3:
           gameData.minoPos.spinPos.row += 1;
           gameData.minoPos.spinPos.grid += 1;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 4:
           gameData.minoPos.spinPos.row += 1;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 5:
           gameData.minoPos.spinPos.row += 1;
           gameData.minoPos.spinPos.grid -= 1;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 6:
           gameData.minoPos.spinPos.row += 2;
           gameData.minoPos.spinPos.grid += 1;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 7:
           gameData.minoPos.spinPos.row += 2;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 8:
           gameData.minoPos.spinPos.row += 2;
           gameData.minoPos.spinPos.grid -= 1;
+          if (gameData.curMino == minoDatas[6].name && checkT_Spin() >= 3)
+            scoreData.isT_Spin = true;
           break;
 
         case 9:
@@ -1835,11 +2044,11 @@ const spinRight = () => {
 
         case 10:
           gameData.minoPos.spinPos.row -= 1;
-          gameData.minoPos.spinPos.grid += 1;
           break;
 
         case 11:
           gameData.minoPos.spinPos.row -= 1;
+          gameData.minoPos.spinPos.grid += 1;
           break;
 
         case 12:
@@ -1863,6 +2072,16 @@ const spinRight = () => {
   rendMino();
 };
 
+export const toggleRestartBtn = (toggle = `on`) => {
+  if (toggle == `on`) {
+    spinReview.classList.add(`info_hidden`);
+    restartBtn.classList.remove(`info_hidden`);
+  } else {
+    spinReview.classList.remove(`info_hidden`);
+    restartBtn.classList.add(`info_hidden`);
+  }
+};
+
 document.addEventListener(`keydown`, (e) => {
   // console.log(e.keyCode);
   if (!gameData.isPlaying && e.key !== `F12`) {
@@ -1876,7 +2095,6 @@ document.addEventListener(`keydown`, (e) => {
     case `ArrowDown`:
       if (keyDatas.downPressed) break;
       keyDatas.downPressed = true;
-      console.log(e.key);
       keyPressDown();
       intervalId.downKey = setInterval(() => {
         keyPressDown();
@@ -1887,8 +2105,7 @@ document.addEventListener(`keydown`, (e) => {
     case `ArrowLeft`:
       if (keyDatas.leftPressed) break;
       keyDatas.leftPressed = true;
-      clearInterval(intervalId.rightKey);
-      console.log(e.key);
+      clearInterval(intervalId.RightKey);
       keyPressLeft();
       intervalId.leftKey = setInterval(() => {
         keyPressLeft();
@@ -1900,7 +2117,6 @@ document.addEventListener(`keydown`, (e) => {
       if (keyDatas.rightPressed) break;
       keyDatas.rightPressed = true;
       clearInterval(intervalId.leftKey);
-      console.log(e.key);
       keyPressRight();
       intervalId.rightKey = setInterval(() => {
         keyPressRight();
@@ -1911,28 +2127,24 @@ document.addEventListener(`keydown`, (e) => {
     case ` `:
       if (keyDatas.dropPressed) break;
       keyDatas.dropPressed = true;
-      console.log(e.key);
       keyPressSpacebar();
       break;
 
     case keyDatas.spinLeft:
       if (keyDatas.spinLeftPressed) break;
       keyDatas.spinLeftPressed = true;
-      console.log(e.key);
       spinLeft();
       break;
 
     case keyDatas.spinRight:
       if (keyDatas.spinRightPressed) break;
       keyDatas.spinRightPressed = true;
-      console.log(e.key);
       spinRight();
       break;
 
     case keyDatas.hold:
       if (keyDatas.holdPressed) break;
       keyDatas.holdPressed = true;
-      console.log(e.key);
       changeHold();
       break;
 
@@ -1991,11 +2203,81 @@ document.addEventListener(`keyup`, (e) => {
   }
 });
 
+const bgmList = [
+  { src: `./bgm/Journey (Kyatto).mp3`, vol: 0.5 },
+  { src: `./bgm/ここからはじまるプロローグ。.mp3`, vol: 0.5 },
+  { src: `./bgm/Lost in the Snow.mp3`, vol: 0.6 },
+  { src: `./bgm/Moonside Howl (Kyatto).mp3`, vol: 0.7 },
+  { src: `./bgm/エンドロールはつづいてく。.mp3`, vol: 0.4 },
+];
+const bgm = [new Audio(bgmList[0].src)];
+const bgmFade = (bgm, vol, fadeTime) => {
+  if (fadeTime > 0) {
+    bgm.volume += ((vol - bgm.volume) * 10) / fadeTime;
+    setTimeout(() => {
+      bgmFade(bgm, vol, fadeTime - 10);
+    }, 10);
+  } else {
+    bgm.volume = vol;
+    if (vol === 0) bgm.pause();
+  }
+};
+export const bgmStart = (fadeTime) => {
+  gameData.curBgm = 0;
+  bgm[0].volume = 0;
+  bgm[0].autoplay = false;
+  bgm[0].loop = true;
+  bgm[0].load();
+  bgm[0].play();
+  bgmFade(bgm[0], bgmList[0].vol, fadeTime);
+};
+// export const bgmCrossFade = (bgmNextID, fadeTime) => {
+//   gameData.curBgm = bgmNextID;
+//   const bgmNext = new Audio(bgmList[bgmNextID].src);
+//   bgmNext.volume = 0;
+//   bgmNext.autoplay = false;
+//   bgmNext.loop = true;
+//   bgmNext.load();
+//   bgmNext.play();
+//   bgmFade(bgm[0], 0, fadeTime);
+//   bgmFade(bgmNext, bgmList[bgmNextID].vol, fadeTime);
+//   setTimeout(() => {
+//     bgm[0] = bgmNext;
+//   }, fadeTime);
+// };
+export const bgmCrossFade = (fadeTime) => {
+  Array(bgmList.length)
+    .fill(0)
+    .forEach((x, i) => {
+      if (
+        i !== bgmList.length &&
+        gameData.curBgm !== i &&
+        gameData.score >= 50000 * i ** 2 &&
+        gameData.score < 50000 * (i + 1) ** 2
+      ) {
+        gameData.curBgm = i;
+        const bgmNext = new Audio(bgmList[i].src);
+        bgmNext.volume = 0;
+        bgmNext.autoplay = false;
+        bgmNext.loop = true;
+        bgmNext.load();
+        bgmNext.play();
+        bgmFade(bgm[0], 0, fadeTime);
+        bgmFade(bgmNext, bgmList[i].vol, fadeTime);
+        setTimeout(() => {
+          bgm[0] = bgmNext;
+        }, fadeTime + 1000);
+      }
+    });
+};
+
 console.log(
   // rendNext,
   // rendHold,
   gameData,
   gameGridData,
-  // minoFall,
   // takeoutNext,
+  // toggleRestartBtn,
+  // bgmStart,
+  // bgmCrossFade,
 );

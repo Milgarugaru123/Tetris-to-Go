@@ -1,29 +1,28 @@
 import {
-  holdCase,
+  // holdCase,
   tetrisScreen,
-  nextCase,
-  furtherNextCase,
+  // nextCase,
+  // furtherNextCase,
   curScore,
   highScore,
-  spinReview,
-  restartBtn,
+  // spinReview,
+  // restartBtn,
+  // comboReview,
+  // comboValReview,
+  // t_SpinReview,
+  // t_SpinMiniReview,
+  // tetrisReview,
+  // backToBackReview,
 } from "./query.js";
 import {
-  minoDatas,
-  makeMino,
-  gridDatas,
-  minoBag,
-  refillBag,
-} from "./mino_datas.js";
-import {
-  rendNext,
-  rendHold,
+  // rendNext,
+  // rendHold,
+  intervalId,
   gameData,
-  gameGridData,
-  takeoutNext,
-  toggleRestartBtn,
-  bgmStart,
-  bgmCrossFade,
+  // gameGridData,
+  // takeoutNext,
+  // toggleRestartBtn,
+  // bgmStart,
 } from "./game.js";
 
 /* 점수 시스템:
@@ -52,48 +51,36 @@ import {
 */
 
 export const scoreData = {
+  baseScore: 10, // init: 10점
+  balance: 5, // 난이도 및 점수 배수
   prevScore: 0,
   lineCleared: 0,
   isT_Spin: false,
-  isBTB: false,
+  isBTB: 0,
   combo: 0,
   maxedScoreLen: undefined,
 };
 
-export const rendScore = () => {
-  const scoreStr = [...String(gameData.score)];
-  const score = scoreStr
+const rendScoreForm = (scoreStr) => {
+  return scoreStr
     .map((x, i) => {
       if ((scoreStr.length - i) % 3 === 1 && i + 1 !== scoreStr.length)
         return x + `,`;
       else return x;
     })
     .reduce((x, y) => x + y);
+};
+
+export const rendScore = () => {
+  const scoreStr = [...String(gameData.score)];
+  const score = rendScoreForm(scoreStr);
   curScore.innerHTML = score;
-  // if (
-  //   gameData.curBgm !== 1 &&
-  //   gameData.score >= 10000 &&
-  //   gameData.score < 100000
-  // )
-  //   bgmCrossFade(1, 3000);
-  // if (
-  //   gameData.curBgm !== 2 &&
-  //   gameData.score >= 100000 &&
-  //   gameData.score < 500000
-  // )
-  //   bgmCrossFade(2, 3000);
-  // if (
-  //   gameData.curBgm !== 3 &&
-  //   gameData.score >= 500000 &&
-  //   gameData.score < 1000000
-  // )
-  //   bgmCrossFade(3, 3000);
-  // if (
-  //   gameData.curBgm !== 4 &&
-  //   gameData.score >= 1000000 &&
-  //   gameData.score < 2000000
-  // )
-  //   gameData.curBgm = 4; // 브금 추가되면...
+};
+
+export const rendHighscore = () => {
+  const scoreStr = [...String(gameData.highscore)];
+  const score = rendScoreForm(scoreStr);
+  highScore.innerHTML = score;
 };
 
 const makeAlpha = (mul) => {
@@ -107,38 +94,78 @@ const makeAlpha = (mul) => {
   );
 };
 export const softDropScore = () => {
-  const baseScore = 10;
-  const alpha = makeAlpha(baseScore);
-  gameData.score += baseScore + (alpha < 0 ? 0 : alpha);
+  if (gameData.minoPos.spinPos.row <= gameData.maxRow) return;
+  const alpha = makeAlpha(scoreData.baseScore);
+  gameData.score +=
+    (scoreData.baseScore + (alpha < 0 ? 0 : alpha)) *
+    Math.ceil(scoreData.balance / 2);
   rendScore();
 };
 export const hardDropScore = (height) => {
-  const baseScore = 10;
-  const alpha = makeAlpha(baseScore);
+  const alpha = makeAlpha(scoreData.baseScore);
   const h = Math.ceil(Math.sqrt((height * 3) / 11));
-  gameData.score += (baseScore + (alpha < 0 ? 0 : alpha)) * height * h;
+  gameData.score +=
+    (scoreData.baseScore + (alpha < 0 ? 0 : alpha)) *
+    height *
+    h *
+    Math.ceil(scoreData.balance / 2);
   rendScore();
 };
 
+const reviewRotate = (range) =>
+  `rotate(${Math.floor(Math.random() * range * 2) - range}deg)`;
+
 export const lineClearScore = (isAllClear) => {
-  const baseScore = 100;
-  const alpha = makeAlpha(baseScore);
+  if (intervalId.allClearReview) {
+    clearTimeout(intervalId.allClearReview);
+    allClearReview.classList.remove(`review_hide`);
+    allClearReview.classList.add(`info_hidden`);
+  }
+  const baseLineClearScore =
+    scoreData.baseScore * 10 * Math.ceil(scoreData.balance / 2);
+  const alpha = makeAlpha(baseLineClearScore);
+  console.log(
+    Math.floor(
+      (baseLineClearScore * (isAllClear ? 5 : 1) + alpha) *
+        scoreData.lineCleared *
+        (scoreData.isT_Spin ? (scoreData.isT_Spin === `mini` ? 1.3 : 2) : 1) *
+        (scoreData.isBTB > 1 ? 1.5 : 1) *
+        (1 + 0.1 * ((scoreData.combo > 15 ? 15 : scoreData.combo) - 1)),
+    ),
+  );
   gameData.score += Math.floor(
-    (baseScore * (isAllClear ? 5 : 1) + alpha) *
+    (baseLineClearScore * (isAllClear ? 5 : 1) + alpha) *
       scoreData.lineCleared *
       (scoreData.isT_Spin ? (scoreData.isT_Spin === `mini` ? 1.3 : 2) : 1) *
-      (scoreData.isBTB ? 1.5 : 1) *
+      (scoreData.isBTB > 1 ? 1.5 : 1) *
       (1 + 0.1 * ((scoreData.combo > 15 ? 15 : scoreData.combo) - 1)),
   );
-  console.log(
-    `${scoreData.combo} 콤보!\n${scoreData.isBTB ? `Back to Back!\n` : ``}${isAllClear ? `올 클리어!` : ``}`,
-  );
+  if (isAllClear) {
+    allClearReview.style.transform = reviewRotate(7.5);
+    allClearReview.classList.remove(`info_hidden`);
+    intervalId.allClearReview = setTimeout(() => {
+      allClearReview.classList.add(`review_hide`);
+      intervalId.allClearReview = setTimeout(() => {
+        allClearReview.classList.remove(`review_hide`);
+        allClearReview.classList.add(`info_hidden`);
+        intervalId.allClearReview = undefined;
+      }, 1000);
+    }, 2000);
+  }
   rendScore();
 };
+
+const allClearReview = document.createElement(`div`);
+allClearReview.classList.add(`all_clear`);
+allClearReview.classList.add(`review_show`);
+allClearReview.classList.add(`info_hidden`);
+allClearReview.innerHTML = `All Clear!`;
+tetrisScreen.appendChild(allClearReview);
 
 console.log(
   scoreData,
   // rendScore,
+  // rendHighscore,
   // softDropScore,
   // hardDropScore,
   // lineClearScore,

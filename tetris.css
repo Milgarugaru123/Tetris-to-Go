@@ -18,32 +18,33 @@
 .grid_border {
   width: 100%;
   height: 100%;
-  border: 1px solid rgba(141, 214, 208, 0.35);
+  /* border: 1px solid rgba(141, 214, 208, 0.35); */
+  background-color: rgba(141, 214, 208, 0.6);
 }
 
 .grid_border_top_left {
-  clip-path: polygon(0% 0%, 25% 0%, 0% 25%);
+  clip-path: polygon(0% 0%, 25% 0%, 23% 2%, 2% 2%, 2% 23%, 0% 25%);
   position: absolute;
   top: 0;
   left: 0;
 }
 
 .grid_border_top_right {
-  clip-path: polygon(100% 0%, 75% 0%, 100% 25%);
+  clip-path: polygon(100% 0%, 75% 0%, 77% 2%, 98% 2%, 98% 23%, 100% 25%);
   position: absolute;
   top: 0;
   right: 0;
 }
 
 .grid_border_bottom_left {
-  clip-path: polygon(0% 100%, 0% 75%, 25% 100%);
+  clip-path: polygon(0% 100%, 0% 75%, 2% 77%, 2% 98%, 23% 98%, 25% 100%);
   position: absolute;
   top: 0;
   left: 0;
 }
 
 .grid_border_bottom_right {
-  clip-path: polygon(100% 100%, 75% 100%, 100% 75%);
+  clip-path: polygon(100% 100%, 75% 100%, 77% 98%, 98% 98%, 98% 77%, 100% 75%);
   position: absolute;
   top: 0;
   left: 0;
@@ -363,12 +364,142 @@ main {
   width: 100%;
   height: calc(27lvh - 120px);
   min-height: 12lvh;
-  border-radius: 1lvh;
+  /* border-radius: 1lvh; */
+  display: flex;
+  flex-flow: column wrap;
+  justify-content: space-evenly;
+  align-items: center;
+  /* padding: 4px; */
+  gap: 4px 8px;
+  pointer-events: none;
+  /* background-color: rgba(122, 122, 122, 0.2); */
+}
+
+.reivew_show {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.spin_review > div > div {
+  font-weight: bolder;
+  position: relative;
+}
+
+.combo > div {
+  color: rgb(160, 95, 16);
+  font-size: 16px;
+  letter-spacing: 0;
+  text-shadow:
+    0 0 8px rgba(255, 153, 21, 0.5),
+    0 0 8px rgb(255, 153, 21),
+    0 0 16px rgb(255, 153, 21);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.combo_val {
+  color: rgb(211, 77, 0);
+  font-size: 20px;
+}
+
+.t_spin > div > div {
+  color: rgb(68, 8, 95);
+  font-size: 20px;
+  width: 120%;
+  aspect-ratio: 3/2;
+  background-color: rgb(161, 34, 219);
+  clip-path: polygon(
+    0% 0%,
+    100% 0%,
+    100% 50%,
+    66% 50%,
+    66% 100%,
+    33% 100%,
+    33% 50%,
+    0% 50%
+  );
+  padding: 2%;
+  text-align: center;
+  position: relative;
+  left: -10%;
+}
+
+.t_spin_mini {
+  color: rgb(53, 6, 75);
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 4px;
+  background-color: rgba(204, 163, 223, 0.7);
+  padding: 2px;
+  position: absolute;
+  right: -5%;
+  bottom: calc(50% - 22px);
+}
+
+.tetris > div {
+  color: rgb(15, 93, 117);
+  font-size: 20px;
+  background-color: rgba(69, 202, 243, 0.4);
+  padding: 2%;
   display: flex;
   justify-content: center;
   align-items: center;
-  pointer-events: none;
-  background-color: rgba(122, 122, 122, 0.2);
+  gap: 2px;
+}
+
+.tetris_I {
+  width: 10px;
+  height: 28px;
+  border: 1px solid rgb(15, 93, 117);
+  border-top: none;
+  background-color: rgb(69, 202, 243);
+  background-image: linear-gradient(rgb(15, 93, 117) 1px, transparent 1px);
+  background-size: 100% 25%;
+}
+
+.back_to_back > div {
+  color: rgb(15, 93, 117);
+  font-size: 20px;
+  line-height: 16px;
+  text-shadow:
+    0 0 10px rgba(161, 34, 219, 0.5),
+    0 0 20px rgb(161, 34, 219),
+    0 0 30px rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.back_to_back > div > span {
+  z-index: 1;
+}
+
+.back_to_back > div > span:nth-child(1) {
+  position: relative;
+  left: -12%;
+}
+
+.back_to_back > div > span:nth-child(3) {
+  position: relative;
+  left: 12%;
+}
+
+.back_to_back > div > div {
+  color: rgba(161, 34, 219, 0.6);
+  font-size: 52px;
+  position: absolute;
+  margin: auto;
+}
+
+.review_hide {
+  transition: all 1.5s;
+  opacity: 0;
 }
 
 .restart {
@@ -391,21 +522,21 @@ main {
 
 .start_btn {
   color: white;
-  font-size: 20px;
+  font-size: 2.5lvh;
   font-weight: bold;
-  border: 3px solid rgb(3, 202, 186);
+  border: 0.5lvh solid rgb(3, 202, 186);
   background-color: rgba(72, 13, 87, 0.4);
-  border-radius: 20px;
-  padding: 10px 20px;
+  border-radius: 2.5lvh;
+  padding: 1.5lvh 3lvh;
   position: absolute;
-  top: calc(50% - 30px);
-  left: calc(50% - 90px);
+  top: calc(50% - 1.4em);
+  left: calc(50% - 4.85em);
   cursor: pointer;
 }
 
 .count_down_num {
   color: rgb(16, 247, 227);
-  font-size: 200px;
+  font-size: 25lvh;
   font-weight: bolder;
   position: absolute;
   top: calc(50% - 0.7em);
@@ -415,5 +546,27 @@ main {
 }
 
 .count_down_animation {
-  font-size: 80px;
+  font-size: 10lvh;
+}
+
+.all_clear {
+  color: rgb(226, 186, 9);
+  font-size: 5lvh;
+  font-weight: bolder;
+  text-shadow:
+    /* 0 0 2lvh rgba(255, 255, 255, 0.5), */
+    0 0 3lvh rgb(255, 255, 255),
+    0 0 2lvh rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  position: absolute;
+  left: 18%;
+  top: 26%;
+  z-index: 2;
+}
+
+.all_clear::before {
+  z-index: -1;
+  content: "All Clear!";
+  position: absolute;
+  -webkit-text-stroke: 0.8lvh rgb(126, 72, 7);
 }

@@ -1,12 +1,18 @@
 import {
   holdCase,
-  tetrisScreen,
+  // tetrisScreen,
   nextCase,
   furtherNextCase,
-  curScore,
-  highScore,
+  // curScore,
+  // highScore,
   spinReview,
   restartBtn,
+  comboReview,
+  comboValReview,
+  t_SpinReview,
+  t_SpinMiniReview,
+  tetrisReview,
+  backToBackReview,
 } from "./query.js";
 import {
   minoDatas,
@@ -18,6 +24,7 @@ import {
 import {
   scoreData,
   rendScore,
+  rendHighscore,
   softDropScore,
   hardDropScore,
   lineClearScore,
@@ -35,17 +42,21 @@ const keyDatas = {
   hold: `Shift`,
   holdPressed: false,
 };
-const intervalId = {
+export const intervalId = {
   leftKey: undefined,
   rightKey: undefined,
   downKey: undefined,
   minoFall: undefined,
+  t_SpinReview: undefined,
+  tetrisReview: undefined,
+  backToBackReview: undefined,
+  allClearReview: undefined,
 };
 export const gameData = {
   isPlaying: false,
   highscore: 0,
   score: 0,
-  initGameSpeed: 1500,
+  initGameSpeed: 1500, // init: 1200~1500
   curBgm: undefined,
   curMino: undefined,
   minoPos: {
@@ -57,11 +68,13 @@ export const gameData = {
   minoSpin: 0, // 0 : default, 1 : 90deg, 2 : 180deg, 3: 270deg
   holdMino: undefined,
   holdDone: false,
+  isSideMoved: false,
   isSpinned: false,
   minoDownInterval: 30, // init: 30~50
   minoSideMoveInterval: 80, // init: 70~80
   bottomDelay: 0,
   maxBottomDelay: 10,
+  maxRow: undefined,
 };
 export const gameGridData = new Array(24).fill(0).map((row) => {
   return Array(10)
@@ -73,14 +86,14 @@ export const gameGridData = new Array(24).fill(0).map((row) => {
 
 const minoFall = () => {
   if (!gameData.isPlaying) return;
+  gameData.isSideMoved = false;
   gameData.isSpinned = false;
   const scoreLen = [...(`` + Math.floor(gameData.score / 100))].length;
-  const balance = 5; // 난이도 별 속도 조절용
   const alpha =
     ((scoreLen < 2 ? 0 : (scoreLen - 1) ** 2) * 10 +
       Math.floor(gameData.score / 10 ** (scoreLen < 2 ? 2 : scoreLen + 1)) *
         (scoreLen * 2 - 1)) *
-    balance;
+    scoreData.balance;
   if (
     gameData.initGameSpeed - alpha < gameData.minoDownInterval &&
     !scoreData.maxedScoreLen
@@ -90,19 +103,22 @@ const minoFall = () => {
     gameData.initGameSpeed - alpha < gameData.minoDownInterval
       ? Math.max(
           gameData.minoDownInterval -
-            (scoreLen - scoreData.maxedScoreLen) * balance,
+            (scoreLen - scoreData.maxedScoreLen) * scoreData.balance,
           10,
         )
       : gameData.initGameSpeed - alpha;
   intervalId.minoFall = setTimeout(() => {
     if (keyDatas.downPressed) {
       if (checkMoveConflict(`down`)) gameData.bottomDelay += 1;
-      console.log(gameData.bottomDelay);
+      if (gameData.minoPos.spinPos.row > gameData.maxRow) {
+        gameData.maxRow = gameData.minoPos.spinPos.row;
+        gameData.bottomDelay = 0;
+      }
       if (gameData.bottomDelay < Math.ceil(gameData.maxBottomDelay / 4))
         minoFall();
       else if (
         gameData.bottomDelay < Math.ceil(gameData.maxBottomDelay / 2) &&
-        (gameData.isSpinned || keyDatas.leftPressed || keyDatas.rightPressed)
+        (gameData.isSpinned || gameData.isSideMoved)
       )
         minoFall();
       else if (
@@ -116,14 +132,16 @@ const minoFall = () => {
       }
     } else {
       const isConflict = keyPressDown();
-      if (isConflict) gameData.bottomDelay += 1;
-      else if (gameData.bottomDelay > 0) gameData.bottomDelay += 0.5;
-      console.log(gameData.bottomDelay);
+      if (isConflict || gameData.bottomDelay > 0) gameData.bottomDelay += 1;
+      if (gameData.minoPos.spinPos.row > gameData.maxRow) {
+        gameData.maxRow = gameData.minoPos.spinPos.row;
+        gameData.bottomDelay = 0;
+      }
       if (gameData.bottomDelay < Math.ceil(gameData.maxBottomDelay / 4))
         minoFall();
       else if (
         gameData.bottomDelay < Math.ceil(gameData.maxBottomDelay / 2) &&
-        (gameData.isSpinned || keyDatas.leftPressed || keyDatas.rightPressed)
+        (gameData.isSpinned || gameData.isSideMoved)
       )
         minoFall();
       else if (
@@ -677,6 +695,9 @@ const setMinoRendGrids = () => {
 
 const gameOver = () => {
   gameData.isPlaying = false;
+  if (gameData.score > gameData.highscore) gameData.highscore = gameData.score;
+  rendHighscore(gameData.highscore);
+  localStorage.setItem(`highscore`, JSON.stringify(gameData.highscore));
   window.alert(`Game Over!`);
   toggleRestartBtn();
 };
@@ -752,6 +773,73 @@ const checkMoveConflict = (move = `stop`) => {
   }
 };
 
+const reviewRotate = (range) =>
+  `rotate(${Math.floor(Math.random() * range * 2) - range}deg)`;
+
+const rendReview = () => {
+  comboReview.classList.add(`info_hidden`);
+  if (!scoreData.isT_Spin) {
+    clearTimeout(intervalId.t_SpinReview);
+    intervalId.t_SpinReview = undefined;
+    t_SpinReview.classList.remove(`review_hide`);
+    t_SpinReview.classList.add(`info_hidden`);
+    t_SpinMiniReview.classList.add(`info_hidden`);
+  }
+  if (scoreData.lineCleared > 0) {
+    if (scoreData.lineCleared === 4) {
+      clearTimeout(intervalId.tetrisReview);
+      tetrisReview.classList.remove(`review_hide`);
+      tetrisReview.classList.add(`info_hidden`);
+    }
+    if (scoreData.isBTB > 1) {
+      clearTimeout(intervalId.backToBackReview);
+      backToBackReview.classList.remove(`review_hide`);
+      backToBackReview.classList.add(`info_hidden`);
+    }
+  }
+  if (scoreData.isT_Spin) {
+    t_SpinReview.style.transform = reviewRotate(5);
+    t_SpinReview.classList.remove(`info_hidden`);
+    if (scoreData.isT_Spin == `mini`)
+      t_SpinMiniReview.classList.remove(`info_hidden`);
+    intervalId.t_SpinReview = setTimeout(() => {
+      t_SpinReview.classList.add(`review_hide`);
+      intervalId.t_SpinReview = setTimeout(() => {
+        t_SpinReview.classList.remove(`review_hide`);
+        t_SpinReview.classList.add(`info_hidden`);
+      }, 1000);
+    }, 500);
+  }
+  if (scoreData.lineCleared > 0) {
+    comboValReview.innerHTML =
+      scoreData.combo >= 15 ? `15 MAX` : scoreData.combo;
+    comboReview.style.transform = reviewRotate(5);
+    comboReview.classList.remove(`info_hidden`);
+    if (scoreData.lineCleared === 4) {
+      tetrisReview.style.transform = reviewRotate(5);
+      tetrisReview.classList.remove(`info_hidden`);
+      setTimeout(() => {
+        tetrisReview.classList.add(`review_hide`);
+        setTimeout(() => {
+          tetrisReview.classList.remove(`review_hide`);
+          tetrisReview.classList.add(`info_hidden`);
+        }, 1000);
+      }, 500);
+    }
+    if (scoreData.isBTB > 1) {
+      backToBackReview.style.transform = reviewRotate(5);
+      backToBackReview.classList.remove(`info_hidden`);
+      setTimeout(() => {
+        backToBackReview.classList.add(`review_hide`);
+        setTimeout(() => {
+          backToBackReview.classList.remove(`review_hide`);
+          backToBackReview.classList.add(`info_hidden`);
+        }, 1000);
+      }, 500);
+    }
+  }
+};
+
 /* 완성된 줄 지우기 */
 const checkRowComplete = () => {
   scoreData.lineCleared = 0;
@@ -795,20 +883,13 @@ const checkRowComplete = () => {
       return rowFilled;
     })
     .reduce((x, y) => x + y);
-  console.log(
-    scoreData.isT_Spin
-      ? scoreData.isT_Spin == `mini`
-        ? `T Spin mini!`
-        : `T SPIN!`
-      : ``,
-  );
   if (scoreData.lineCleared > 0) {
     scoreData.combo += 1;
-    if (scoreData.lineCleared === 4 || scoreData.isT_Spin)
-      scoreData.isBTB = true;
-    else scoreData.isBTB = false;
+    if (scoreData.lineCleared === 4 || scoreData.isT_Spin) scoreData.isBTB += 1;
+    else scoreData.isBTB = 0;
     lineClearScore(!(gridFilled - scoreData.lineCleared * 10));
   } else scoreData.combo = 0;
+  rendReview();
   scoreData.tempScore = gameData.score;
   scoreData.isT_Spin = false;
   bgmCrossFade(3000);
@@ -822,6 +903,7 @@ const minoSpawn = () => {
   gameData.minoSpin = 0;
   gameData.isSpinned = false;
   gameData.bottomDelay = 0;
+  gameData.maxRow = gameData.minoPos.spinPos.row;
   setMinoRendGrids();
   const checkConflict = checkMoveConflict();
   if (checkConflict) {
@@ -1014,6 +1096,7 @@ const keyPressDown = () => {
 };
 const keyPressLeft = () => {
   if (checkMoveConflict(`left`)) return;
+  gameData.isSideMoved = true;
   scoreData.isT_Spin = false;
   minoRemovePrev();
   gameData.minoPos.spinPos = {
@@ -1025,6 +1108,7 @@ const keyPressLeft = () => {
 };
 const keyPressRight = () => {
   if (checkMoveConflict(`right`)) return;
+  gameData.isSideMoved = true;
   scoreData.isT_Spin = false;
   minoRemovePrev();
   gameData.minoPos.spinPos = {
@@ -1338,6 +1422,7 @@ const checkSpinI_MinoConflict = (pos, pos1, pos2, pos3, lr, spin) => {
   return 0;
 };
 const checkSpinMinoConflict = (pos, pos1, pos2, pos3, lr) => {
+  scoreData.isT_Spin = false;
   if (
     !(
       checkSpinOutOfBoard(pos, pos1, pos2, pos3) ||
@@ -1363,7 +1448,8 @@ const checkSpinMinoConflict = (pos, pos1, pos2, pos3, lr) => {
       checkGridConflict(pos3.row, pos3.grid - lr)
     )
   ) {
-    scoreData.isT_Spin = `mini`;
+    if (gameData.minoSpin === 0 || gameData.minoSpin === 2)
+      scoreData.isT_Spin = `mini`;
     return 9;
   }
   if (
@@ -2083,7 +2169,6 @@ export const toggleRestartBtn = (toggle = `on`) => {
 };
 
 document.addEventListener(`keydown`, (e) => {
-  // console.log(e.keyCode);
   if (!gameData.isPlaying && e.key !== `F12`) {
     e.preventDefault();
     return;
@@ -2231,29 +2316,15 @@ export const bgmStart = (fadeTime) => {
   bgm[0].play();
   bgmFade(bgm[0], bgmList[0].vol, fadeTime);
 };
-// export const bgmCrossFade = (bgmNextID, fadeTime) => {
-//   gameData.curBgm = bgmNextID;
-//   const bgmNext = new Audio(bgmList[bgmNextID].src);
-//   bgmNext.volume = 0;
-//   bgmNext.autoplay = false;
-//   bgmNext.loop = true;
-//   bgmNext.load();
-//   bgmNext.play();
-//   bgmFade(bgm[0], 0, fadeTime);
-//   bgmFade(bgmNext, bgmList[bgmNextID].vol, fadeTime);
-//   setTimeout(() => {
-//     bgm[0] = bgmNext;
-//   }, fadeTime);
-// };
-export const bgmCrossFade = (fadeTime) => {
+const bgmCrossFade = (fadeTime) => {
   Array(bgmList.length)
     .fill(0)
     .forEach((x, i) => {
       if (
         i !== bgmList.length &&
         gameData.curBgm !== i &&
-        gameData.score >= 50000 * i ** 2 &&
-        gameData.score < 50000 * (i + 1) ** 2
+        gameData.score >= scoreData.baseScore ** scoreData.balance * i ** 2 &&
+        gameData.score < scoreData.baseScore ** scoreData.balance * (i + 1) ** 2
       ) {
         gameData.curBgm = i;
         const bgmNext = new Audio(bgmList[i].src);
@@ -2274,10 +2345,10 @@ export const bgmCrossFade = (fadeTime) => {
 console.log(
   // rendNext,
   // rendHold,
+  intervalId,
   gameData,
   gameGridData,
   // takeoutNext,
   // toggleRestartBtn,
   // bgmStart,
-  // bgmCrossFade,
 );

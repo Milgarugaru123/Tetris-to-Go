@@ -22,3 +22,10 @@
   <li><a href="https://kyattoworks.com/">KyattoWorks</a></li>
   <li><a href="https://aiueoeiua.wixsite.com/aaaaofficial">ああああ</a></li>
 </ul>
+
+<br /><hr /><br />
+<h4>추후 작업 예정</h4>
+<ol>
+  <li>유저 키 설정 만들기</li>
+  <li>bgm 추가하기 (현재 5개 뿐)</li>
+</ol>

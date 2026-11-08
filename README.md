@@ -1,4 +1,5 @@
 <h1>Tetris to go!</h1>
+<h2>(Ver. 2.1.1)</h2>
 <br />
 당연한 말이지만, 기본적으로 테트리스에 관한 모든 저작권은 TTC (The Tetris Company)에 있습니다.
 <hr /><br /><br />
@@ -11,7 +12,7 @@
   <li>미노 하드 드롭 : 스페이스바</li><br />
   <li>미노 시계방향 회전 : D 키</li>
   <li>미노 반시계방향 회전 : S 키</li>
-  <li>미노 홀드 : left_Shift 키</li>
+  <li>미노 홀드 : left_Shift 키 (right_shift 키는 안 됨)</li>
 </ul>
 <br /><br /><br />
 그럼 모두 재미있게 플레이하세요~
@@ -28,5 +29,4 @@
 <ol>
   <li>유저 키 설정 만들기</li>
   <li>bgm 추가하기 (현재 5개 뿐)</li>
-  <li>미노 프리뷰 (바닥) 보여주기</li>
 </ol>
